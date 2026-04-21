@@ -1,22 +1,25 @@
 {
-  "name": "temp_project",
+  "name": "green-store-backend-mysql",
   "version": "0.1.0",
   "private": true,
   "scripts": {
     "dev": "next dev ",
     "build": "next build --turbopack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "db:init": "mysql -u root -p < mysql.sql",
+    "db:migrate:orders": "mysql -u root -p < sql/alter_orders_add_payment.sql"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@neondatabase/serverless": "^1.0.2",
     "@types/bcrypt": "^6.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/leaflet": "^1.9.21",
     "@types/next-auth": "^3.13.0",
-    "@vercel/postgres": "^0.10.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^3.0.2",
     "framer-motion": "^12.23.24",
@@ -24,6 +27,7 @@
     "jsonwebtoken": "^9.0.2",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.546.0",
+    "mysql2": "^3.22.1",
     "next": "^16.2.0",
     "next-auth": "^4.24.13",
     "qrcode": "^1.5.4",
@@ -46,6 +50,7 @@
     "eslint": "^9",
     "eslint-config-next": "15.5.4",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

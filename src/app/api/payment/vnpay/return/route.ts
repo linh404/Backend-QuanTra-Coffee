@@ -37,9 +37,9 @@ export async function GET(request: Request) {
       UPDATE orders 
       SET 
         payment_status = ${isSuccess ? 'PAID' : 'FAILED'},
-        status = ${isSuccess ? 'PROCESSING' : 'CANCELLED'},
-        paid_amount = ${isSuccess ? amount : 0},
+        status = ${isSuccess ? 'paid' : 'cancelled'},
         paid_at = ${isSuccess ? new Date() : null},
+        cancelled_at = ${isSuccess ? null : new Date()},
         updated_at = NOW()
       WHERE id = ${Number(orderId)}
     `;

@@ -36,13 +36,19 @@ export async function POST(request: Request) {
     const passwordHash = await bcrypt.hash(password, 12)
 
     // Create user
-    const newUsers = await sql`
+    await sql`
       INSERT INTO users (email, password_hash, name, role, created_at, updated_at)
       VALUES (${email}, ${passwordHash}, ${name}, ${role}, NOW(), NOW())
-      RETURNING id, email, name, role
     `
 
-    const user = newUsers[0]
+    const createdUsers = await sql`
+      SELECT id, email, name, role
+      FROM users
+      WHERE email = ${email}
+      LIMIT 1
+    `
+
+    const user = createdUsers[0]
     
     // If address fields provided, save into user_addresses
     if (line1 && city && district && ward) {

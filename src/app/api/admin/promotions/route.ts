@@ -17,22 +17,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     // Get all products that are on sale (is_sale = true)
@@ -99,22 +91,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
@@ -124,18 +108,24 @@ export async function POST(request: NextRequest) {
     } = body
 
     // Update product to set it on sale
-    const result = await sql`
+    await sql`
       UPDATE products 
       SET 
         is_sale = true,
         sale_price = ${salePrice}
       WHERE id = ${productId}
-      RETURNING *
+    `
+
+    const updatedProduct = await sql`
+      SELECT id, name, slug, brand, description, category_id, is_active, price, image_url, created_at, updated_at, sale_price, stock, is_sale
+      FROM products
+      WHERE id = ${productId}
+      LIMIT 1
     `
 
     return NextResponse.json({
       success: true,
-      data: result[0]
+      data: updatedProduct[0]
     })
   } catch (error) {
     console.error('Error creating promotion:', error)
@@ -164,38 +154,36 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
     const { productId, isSale } = body
 
     // Update product sale status
-    const result = await sql`
+    await sql`
       UPDATE products 
       SET is_sale = ${isSale}
       WHERE id = ${productId}
-      RETURNING *
+    `
+
+    const updatedProduct = await sql`
+      SELECT id, name, slug, brand, description, category_id, is_active, price, image_url, created_at, updated_at, sale_price, stock, is_sale
+      FROM products
+      WHERE id = ${productId}
+      LIMIT 1
     `
 
     return NextResponse.json({
       success: true,
-      data: result[0]
+      data: updatedProduct[0]
     })
   } catch (error) {
     console.error('Error updating promotion:', error)

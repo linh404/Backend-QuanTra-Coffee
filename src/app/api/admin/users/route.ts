@@ -17,22 +17,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     // Get all users with order statistics
@@ -85,65 +77,30 @@ export async function PUT(request: NextRequest) {
     }
 
     // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     const body = await request.json()
     const { userId, status, role } = body
 
-    // Update user status or role
-    if (status && role) {
-      // Update both status and role
-      const result = await sql`
-        UPDATE users 
-        SET status = ${status}, role = ${role}, updated_at = NOW()
-        WHERE id = ${userId}
-        RETURNING *
-      `
-      return NextResponse.json({
-        success: true,
-        data: result[0]
-      })
-    } else if (status) {
-      // Update only status
-      const result = await sql`
-        UPDATE users 
-        SET status = ${status}, updated_at = NOW()
-        WHERE id = ${userId}
-        RETURNING *
-      `
-      return NextResponse.json({
-        success: true,
-        data: result[0]
-      })
-    } else if (role) {
-      // Update only role
-      const result = await sql`
-        UPDATE users 
-        SET role = ${role}, updated_at = NOW()
-        WHERE id = ${userId}
-        RETURNING *
-      `
-      return NextResponse.json({
-        success: true,
-        data: result[0]
-      })
-    } else {
+    if (status && !role) {
+      return NextResponse.json(
+        { 
+          success: false,
+          error: 'User status is not supported by the current MySQL schema' 
+        },
+        { status: 400 }
+      )
+    }
+
+    if (!role) {
       return NextResponse.json(
         { 
           success: false, 
@@ -152,6 +109,24 @@ export async function PUT(request: NextRequest) {
         { status: 400 }
       )
     }
+
+    await sql`
+      UPDATE users 
+      SET role = ${role}, updated_at = NOW()
+      WHERE id = ${userId}
+    `
+
+    const updatedUsers = await sql`
+      SELECT id, email, name, role, created_at, updated_at
+      FROM users
+      WHERE id = ${userId}
+      LIMIT 1
+    `
+
+    return NextResponse.json({
+      success: true,
+      data: updatedUsers[0]
+    })
   } catch (error) {
     console.error('Error updating user:', error)
     return NextResponse.json(

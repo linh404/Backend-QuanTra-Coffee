@@ -22,6 +22,7 @@ export async function GET(request: Request) {
           name, 
           slug, 
           brand,
+          short_description AS "shortDescription",
           description,
           price, 
           sale_price AS "salePrice", 
@@ -41,6 +42,7 @@ export async function GET(request: Request) {
           name, 
           slug, 
           brand,
+          short_description AS "shortDescription",
           description,
           price, 
           sale_price AS "salePrice", 
@@ -48,8 +50,9 @@ export async function GET(request: Request) {
           stock, 
           category_id, 
           image_url AS "imageUrl"
-        FROM products 
-        WHERE category_name ILIKE ${`%${category_name}%`} 
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE LOWER(c.name) LIKE LOWER(${'%' + category_name + '%'}) 
         LIMIT ${limit} 
         OFFSET ${offset}
       `;
@@ -60,6 +63,7 @@ export async function GET(request: Request) {
           name, 
           slug, 
           brand,
+          short_description AS "shortDescription",
           description,
           price, 
           sale_price AS "salePrice", 

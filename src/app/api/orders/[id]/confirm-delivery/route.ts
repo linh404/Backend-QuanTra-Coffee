@@ -23,24 +23,14 @@ export async function POST(
       )
     }
 
-    // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      // Double check in database
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     await sql`

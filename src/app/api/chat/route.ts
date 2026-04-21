@@ -124,7 +124,7 @@ export async function POST(request: Request) {
             const orderRes = await fetch(`${getBaseUrl()}/api/orders/${args.order_id}/status`);
             const order = await orderRes.json();
             if (order && order.id) {
-              reply = `Đơn hàng #${order.id} - Trạng thái: ${order.status || 'N/A'}, Tổng tiền: ${formatVnd(order.total_amount)}`;
+              reply = `Đơn hàng #${order.id} - Trạng thái: ${order.status || 'N/A'}, Tổng tiền: ${formatVnd(order.total)}`;
             } else {
               reply = 'Không tìm thấy đơn hàng này.';
             }

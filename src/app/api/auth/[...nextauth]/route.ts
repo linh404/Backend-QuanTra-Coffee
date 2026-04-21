@@ -32,7 +32,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         const result = await sql`
-          SELECT id, email, password 
+          SELECT id, email, password_hash 
           FROM users 
           WHERE email = ${credentials.email}
           LIMIT 1
@@ -43,7 +43,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         }
 
-        const isValidPassword = await compare(credentials.password, user.password);
+        const isValidPassword = await compare(credentials.password, user.password_hash);
 
         if (!isValidPassword) {
           return null;

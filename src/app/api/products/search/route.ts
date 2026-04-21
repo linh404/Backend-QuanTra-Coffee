@@ -65,7 +65,7 @@ export async function GET(request: Request) {
     })();
 
     const searchClause = rawSearch
-      ? sql`AND p.name ILIKE ${searchTerm}`
+      ? sql`AND LOWER(p.name) LIKE LOWER(${searchTerm})`
       : sql``;
 
     const products = await sql`

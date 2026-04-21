@@ -19,9 +19,7 @@ export async function PATCH(
     const body = await request.json()
     const { action } = body 
 
-    // Kiểm tra quyền Admin dựa trên cột 'role'
-    const dbUser = await sql`SELECT role FROM users WHERE id = ${user.userId}`
-    if (dbUser.length === 0 || dbUser[0].role !== 'admin') {
+    if (user.role !== 'admin') {
       return NextResponse.json({ success: false, error: 'Yêu cầu quyền Admin' }, { status: 403 })
     }
 
@@ -49,7 +47,6 @@ export async function PATCH(
     }
 
     // Thực hiện cập nhật Database
-    // Sử dụng ép kiểu (::order_status) nếu cần thiết, nhưng Neon sql thường tự xử lý chuỗi
     await sql`
       UPDATE orders 
       SET 
@@ -85,9 +82,12 @@ export async function GET(
     const orders = await sql`
       SELECT 
         o.*, 
-        u.full_name as user_name, 
+        u.name as user_name, 
         u.email as user_email,
-        ua.address_line1, ua.city, ua.phone_number
+        ua.line1 as address_line1,
+        ua.city,
+        ua.district,
+        ua.ward
       FROM orders o
       JOIN users u ON o.user_id = u.id
       LEFT JOIN user_addresses ua ON o.shipping_address_id = ua.id

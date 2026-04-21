@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       paymentMethod,
       addressId
     })
-    const newOrders = await sql`
+    await sql`
       INSERT INTO orders (
         user_id, 
         status, 
@@ -142,10 +142,17 @@ export async function POST(request: NextRequest) {
         NOW(), 
         NOW()
       )
-      RETURNING *
     `
 
-    const order = newOrders[0]
+    const createdOrders = await sql`
+      SELECT *
+      FROM orders
+      WHERE user_id = ${userId}
+      ORDER BY placed_at DESC, id DESC
+      LIMIT 1
+    `
+
+    const order = createdOrders[0]
 
     // Create order items
     const orderItems = await Promise.all(
@@ -153,7 +160,6 @@ export async function POST(request: NextRequest) {
         sql`
           INSERT INTO order_items (order_id, product_id, qty, unit_price, total, updated_at)
           VALUES (${order.id}, ${item.product_id}, ${item.qty}, ${item.unit_price_snapshot}, ${parseFloat(item.unit_price_snapshot) * item.qty}, NOW())
-          RETURNING *
         `
       )
     )

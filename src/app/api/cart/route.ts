@@ -25,12 +25,16 @@ export async function GET(request: NextRequest) {
     let cart
     if (carts.length === 0) {
       // Create cart if it doesn't exist
-      const newCarts = await sql`
+      await sql`
         INSERT INTO carts (user_id, created_at, updated_at)
         VALUES (${userId}, NOW(), NOW())
-        RETURNING *
       `
-      cart = newCarts[0]
+
+      const createdCarts = await sql`
+        SELECT * FROM carts WHERE user_id = ${userId} LIMIT 1
+      `
+
+      cart = createdCarts[0]
     } else {
       cart = carts[0]
     }

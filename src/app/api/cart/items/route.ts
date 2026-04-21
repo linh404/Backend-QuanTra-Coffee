@@ -36,12 +36,16 @@ export async function POST(request: NextRequest) {
 
     let cart
     if (carts.length === 0) {
-      const newCarts = await sql`
+      await sql`
         INSERT INTO carts (user_id, created_at, updated_at)
         VALUES (${userId}, NOW(), NOW())
-        RETURNING *
       `
-      cart = newCarts[0]
+
+      const createdCarts = await sql`
+        SELECT * FROM carts WHERE user_id = ${userId} LIMIT 1
+      `
+
+      cart = createdCarts[0]
     } else {
       cart = carts[0]
     }
@@ -72,20 +76,32 @@ export async function POST(request: NextRequest) {
     let cartItem
     if (existingItems.length > 0) {
       // Update existing item
-      const updatedItems = await sql`
+      await sql`
         UPDATE cart_items 
         SET qty = ${qty}, unit_price_snapshot = ${product.price}, updated_at = NOW()
         WHERE cart_id = ${cart.id} AND product_id = ${productId}
-        RETURNING *
       `
+
+      const updatedItems = await sql`
+        SELECT * FROM cart_items
+        WHERE cart_id = ${cart.id} AND product_id = ${productId}
+        LIMIT 1
+      `
+
       cartItem = updatedItems[0]
     } else {
       // Create new item
-      const newItems = await sql`
+      await sql`
         INSERT INTO cart_items (cart_id, product_id, qty, unit_price_snapshot, updated_at)
         VALUES (${cart.id}, ${productId}, ${qty}, ${product.price}, NOW())
-        RETURNING *
       `
+
+      const newItems = await sql`
+        SELECT * FROM cart_items
+        WHERE cart_id = ${cart.id} AND product_id = ${productId}
+        LIMIT 1
+      `
+
       cartItem = newItems[0]
     }
 

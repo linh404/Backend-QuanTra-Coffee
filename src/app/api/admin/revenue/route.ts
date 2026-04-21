@@ -16,24 +16,14 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Check if user is admin
-    const isAdmin = user.role === 'admin'
-    
-    if (!isAdmin) {
-      // Double check in database
-      const dbUser = await sql`
-        SELECT is_admin FROM users WHERE id = ${user.userId}
-      `
-      
-      if (dbUser.length === 0 || !dbUser[0].is_admin) {
-        return NextResponse.json(
-          { 
-            success: false, 
-            error: 'Admin access required' 
-          },
-          { status: 403 }
-        )
-      }
+    if (user.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          success: false, 
+          error: 'Admin access required' 
+        },
+        { status: 403 }
+      )
     }
 
     // Get current date for calculations
@@ -53,8 +43,8 @@ export async function GET(request: NextRequest) {
       SELECT COALESCE(SUM(total), 0) as monthly_revenue
       FROM orders 
       WHERE status = 'delivered'
-        AND EXTRACT(YEAR FROM delivered_at) = ${currentYear}
-        AND EXTRACT(MONTH FROM delivered_at) = ${currentMonth}
+        AND YEAR(delivered_at) = ${currentYear}
+        AND MONTH(delivered_at) = ${currentMonth}
     `
 
     // Calculate yearly revenue (current year, delivered orders)
@@ -62,7 +52,7 @@ export async function GET(request: NextRequest) {
       SELECT COALESCE(SUM(total), 0) as yearly_revenue
       FROM orders 
       WHERE status = 'delivered'
-        AND EXTRACT(YEAR FROM delivered_at) = ${currentYear}
+        AND YEAR(delivered_at) = ${currentYear}
     `
 
     // Get additional stats for context
@@ -80,14 +70,14 @@ export async function GET(request: NextRequest) {
     // Get monthly breakdown for chart (last 12 months)
     const monthlyBreakdownResult = await sql`
       SELECT 
-        EXTRACT(YEAR FROM delivered_at) as year,
-        EXTRACT(MONTH FROM delivered_at) as month,
+        YEAR(delivered_at) as year,
+        MONTH(delivered_at) as month,
         COALESCE(SUM(total), 0) as revenue,
         COUNT(*) as order_count
       FROM orders 
       WHERE status = 'delivered'
-        AND delivered_at >= CURRENT_DATE - INTERVAL '12 months'
-      GROUP BY EXTRACT(YEAR FROM delivered_at), EXTRACT(MONTH FROM delivered_at)
+        AND delivered_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+      GROUP BY YEAR(delivered_at), MONTH(delivered_at)
       ORDER BY year DESC, month DESC
     `
 

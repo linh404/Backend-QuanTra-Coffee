@@ -12,7 +12,11 @@ export async function GET(request: Request) {
   }
 
   try {
-    const rows = await sql`SELECT id, name AS title, slug, price, sale_price AS price_sale, is_sale, stock, category_id, image_url FROM products WHERE id = ANY(${ids})`;
+    const placeholders = ids.map(() => '?').join(', ');
+    const rows = await sql.query(
+      `SELECT id, name AS title, slug, price, sale_price AS price_sale, is_sale, stock, category_id, image_url FROM products WHERE id IN (${placeholders})`,
+      ids
+    );
     return NextResponse.json(rows);
   } catch (err) {
     console.error('compare error', err);

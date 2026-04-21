@@ -6,13 +6,13 @@ type ProductRow = {
   name: string
   slug: string
   brand: string | null
+  short_description: string | null
   description: string | null
   price: number
   sale_price: number | null
   is_sale: boolean | null
   stock: number | null
   image_url: string | null
-  gallery: string[] | null
   category_id: number | null
   category_name: string | null
   category_slug: string | null
@@ -50,13 +50,12 @@ export async function GET(request: Request) {
 
     const searchClause = rawQuery
       ? sql`AND (
-          p.name ILIKE ${query}
+          LOWER(p.name) LIKE LOWER(${query})
         )`
       : sql``
 
     const products = await sql`
-      SELECT p.*, c.name as category_name, c.slug as category_slug,
-        (SELECT json_agg(pi.image_url) FROM product_images pi WHERE pi.product_id = p.id) as gallery
+      SELECT p.*, c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = true
@@ -87,13 +86,14 @@ export async function GET(request: Request) {
       name: product.name,
       slug: product.slug,
       brand: product.brand,
+      shortDescription: product.short_description,
       description: product.description,
       price: product.price,
       salePrice: product.sale_price,
       isSale: product.is_sale || false,
       stock: product.stock || 0,
       imageUrl: product.image_url,
-      gallery: product.gallery || [],
+      images: [],
       category: {
         id: product.category_id,
         name: product.category_name,

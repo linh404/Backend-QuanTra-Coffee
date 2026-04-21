@@ -25,7 +25,9 @@ export async function GET(request: Request) {
       const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any
       
       const user = await sql`
-        SELECT id, email, name, role, avatar, created_at FROM users WHERE id = ${decoded.userId}
+        SELECT id, email, name, role, created_at, updated_at
+        FROM users
+        WHERE id = ${decoded.userId}
       `
 
       if (!user) {
@@ -81,7 +83,6 @@ export async function PUT(request: Request) {
     const formData = await request.formData()
     
     const name = formData.get('name') as string
-    const avatar = formData.get('avatar') as File | null
     const currentPassword = formData.get('currentPassword') as string | null
     const newPassword = formData.get('newPassword') as string | null
     
@@ -90,7 +91,9 @@ export async function PUT(request: Request) {
       
       // Get current user data
       const currentUser = await sql`
-        SELECT id, email, name, password_hash FROM users WHERE id = ${decoded.userId}
+        SELECT id, email, name, password_hash
+        FROM users
+        WHERE id = ${decoded.userId}
       `
 
       if (!currentUser || currentUser.length === 0) {
@@ -129,18 +132,6 @@ export async function PUT(request: Request) {
         }
       }
 
-      // Handle avatar upload
-      let avatarUrl = null
-      if (avatar) {
-        const bytes = await avatar.arrayBuffer()
-        const buffer = Buffer.from(bytes)
-        const fileName = Date.now() + '-' + avatar.name
-        const uploadPath = path.join(process.cwd(), 'public/uploads', fileName)
-        
-        await writeFile(uploadPath, buffer)
-        avatarUrl = '/uploads/' + fileName
-      }
-
       // Prepare update data
       const updateData: any = {
         updated_at: new Date()
@@ -151,33 +142,33 @@ export async function PUT(request: Request) {
         updateData.password_hash = await bcrypt.hash(newPassword, 12)
       }
 
-      // Build dynamic update query
-      let updateQuery = 'UPDATE users SET '
-      const updateValues: any[] = []
-      let paramIndex = 1
-      
+      const updates: string[] = []
+      const values: any[] = []
+
       if (updateData.name) {
-        updateQuery += `name = $${paramIndex}, `
-        updateValues.push(updateData.name)
-        paramIndex++
+        updates.push('name = ?')
+        values.push(updateData.name)
       }
-      
+
       if (updateData.password_hash) {
-        updateQuery += `password_hash = $${paramIndex}, `
-        updateValues.push(updateData.password_hash)
-        paramIndex++
+        updates.push('password_hash = ?')
+        values.push(updateData.password_hash)
       }
-      
-      if (avatarUrl) {
-        updateQuery += `avatar = $${paramIndex}, `
-        updateValues.push(avatarUrl)
-        paramIndex++
-      }
-      
-      updateQuery += `updated_at = $${paramIndex} WHERE id = $${paramIndex + 1} RETURNING id, email, name, role, avatar, created_at, updated_at`
-      updateValues.push(updateData.updated_at, decoded.userId)
-      
-      const updatedUser = await sql.query(updateQuery, updateValues)
+
+      updates.push('updated_at = CURRENT_TIMESTAMP')
+      values.push(decoded.userId)
+
+      await sql.query(
+        `UPDATE users SET ${updates.join(', ')} WHERE id = ?`,
+        values
+      )
+
+      const updatedUser = await sql`
+        SELECT id, email, name, role, created_at, updated_at
+        FROM users
+        WHERE id = ${decoded.userId}
+        LIMIT 1
+      `
 
       return NextResponse.json({
         success: true,

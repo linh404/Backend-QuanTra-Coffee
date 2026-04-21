@@ -8,8 +8,7 @@ export async function GET(
   try {
     const { slug } = await params
     const products = await sql`
-      SELECT p.*, c.name as category_name, c.slug as category_slug,
-        (SELECT json_agg(pi.image_url) FROM product_images pi WHERE pi.product_id = p.id) as gallery
+      SELECT p.*, c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.slug = ${slug}
@@ -27,24 +26,53 @@ export async function GET(
 
     const product = products[0]
 
+    // Get images for this product
+    const images = await sql`
+      SELECT id, url, is_main
+      FROM product_images
+      WHERE product_id = ${product.id}
+      ORDER BY is_main DESC, id ASC
+    `
+
+    // Get tags for this product
+    const tags = await sql`
+      SELECT t.id, t.name, t.slug
+      FROM tags t
+      JOIN product_tags_map ptm ON t.id = ptm.tag_id
+      WHERE ptm.product_id = ${product.id}
+      ORDER BY t.name ASC
+    `
+
     // Map database fields to frontend format
     const mappedProduct = {
       id: product.id,
       name: product.name,
       slug: product.slug,
       brand: product.brand,
+      shortDescription: product.short_description,
       description: product.description,
       price: product.price,
       salePrice: product.sale_price,
       isSale: product.is_sale || false,
       stock: product.stock || 0,
       imageUrl: product.image_url,
-      gallery: product.gallery || [],
+      images: images.map(img => ({
+        id: img.id,
+        url: img.url,
+        isMain: img.is_main
+      })),
+      tags: tags.map(tag => ({
+        id: tag.id,
+        name: tag.name,
+        slug: tag.slug
+      })),
       category: {
         id: product.category_id,
         name: product.category_name,
         slug: product.category_slug
-      }
+      },
+      createdAt: product.created_at,
+      updatedAt: product.updated_at
     }
 
     return NextResponse.json({

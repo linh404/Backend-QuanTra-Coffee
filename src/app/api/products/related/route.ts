@@ -7,24 +7,26 @@ export async function GET(request: Request) {
     const excludeId = searchParams.get('excludeId')
     const limit = parseInt(searchParams.get('limit') || '10')
 
-    // Build WHERE conditions
-    let whereConditions = 'p.is_active = true'
-    if (excludeId) {
-      whereConditions += ` AND p.id != ${parseInt(excludeId)}`
-    }
-
-    // Get random products
-    const products = await sql`
+    let query = `
       SELECT p.*, c.name as category_name, c.slug as category_slug
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
-      WHERE ${sql.unsafe(whereConditions)}
-      ORDER BY RANDOM()
-      LIMIT ${limit}
+      WHERE p.is_active = 1
     `
+    const values: Array<number> = []
+
+    if (excludeId) {
+      query += ' AND p.id != ?'
+      values.push(parseInt(excludeId))
+    }
+
+    query += ' ORDER BY RAND() LIMIT ?'
+    values.push(limit)
+
+    const products = await sql.query(query, values)
 
     // Map database fields to frontend format
-    const mappedProducts = products.map(product => ({
+    const mappedProducts = (products as Array<Record<string, any>>).map((product) => ({
       id: product.id,
       name: product.name,
       slug: product.slug,

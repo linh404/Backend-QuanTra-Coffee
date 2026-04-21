@@ -47,7 +47,7 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
       `
     }
 
-    const updatedAddresses = await sql`
+    await sql`
       UPDATE user_addresses 
       SET 
         line1 = ${line1},
@@ -57,7 +57,13 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
         is_default = ${isDefaultBoolean},
         updated_at = NOW()
       WHERE id = ${addressId} AND user_id = ${userId}
-      RETURNING *
+    `
+
+    const updatedAddresses = await sql`
+      SELECT *
+      FROM user_addresses
+      WHERE id = ${addressId} AND user_id = ${userId}
+      LIMIT 1
     `
 
     const address = updatedAddresses[0]

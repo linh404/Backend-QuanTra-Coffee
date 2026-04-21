@@ -66,10 +66,17 @@ export async function POST(request: NextRequest) {
       `
     }
 
-    const addresses = await sql`
+    await sql`
       INSERT INTO user_addresses (user_id, line1, city, district, ward, is_default, created_at, updated_at)
       VALUES (${userId}, ${line1}, ${city}, ${district}, ${ward}, ${isDefaultBoolean}, NOW(), NOW())
-      RETURNING *
+    `
+
+    const addresses = await sql`
+      SELECT *
+      FROM user_addresses
+      WHERE user_id = ${userId}
+      ORDER BY created_at DESC, id DESC
+      LIMIT 1
     `
 
     const address = addresses[0]
