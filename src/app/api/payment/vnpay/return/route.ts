@@ -20,29 +20,40 @@ export async function GET(request: Request) {
 
     if (!isValid) {
       console.error('[VNPay] Invalid checksum');
-      return redirect(`${process.env.NEXTAUTH_URL}/payment/failed`);
+      const frontendUrl = process.env.NEXTAUTH_URL || 'http://localhost:5173';
+      return redirect(`${frontendUrl}/checkout-success?status=failed&method=vnpay`);
     }
 
     const vnp_ResponseCode = searchParams.get('vnp_ResponseCode');
     const isSuccess = vnp_ResponseCode === '00';
 
-    // ⚠️ Validate orderId
+    // Validate orderId
     if (!orderId || isNaN(Number(orderId))) {
       console.error('[VNPay] Invalid orderId:', orderId);
-      return redirect(`${process.env.NEXTAUTH_URL}/payment/failed`);
+      const frontendUrl = process.env.NEXTAUTH_URL || 'http://localhost:5173';
+      return redirect(`${frontendUrl}/checkout-success?status=failed&method=vnpay`);
     }
 
-    // Update order
-    await sql`
-      UPDATE orders 
-      SET 
-        payment_status = ${isSuccess ? 'SUCCESS' : 'FAILED'},
-        status = ${isSuccess ? 'paid' : 'cancelled'},
-        paid_at = ${isSuccess ? new Date() : null},
-        cancelled_at = ${isSuccess ? null : new Date()},
-        updated_at = NOW()
-      WHERE id = ${Number(orderId)}
-    `;
+    // Update order - AUTO CONFIRM on successful payment (no admin needed)
+    if (isSuccess) {
+      await sql`
+        UPDATE orders 
+        SET 
+          payment_status = 'SUCCESS',
+          status = 'confirmed',
+          paid_at = NOW(),
+          updated_at = NOW()
+        WHERE id = ${Number(orderId)}
+      `;
+    } else {
+      await sql`
+        UPDATE orders 
+        SET 
+          payment_status = 'FAILED',
+          updated_at = NOW()
+        WHERE id = ${Number(orderId)}
+      `;
+    }
 
     console.log('[VNPay] Payment result:', {
       orderId,
@@ -51,13 +62,15 @@ export async function GET(request: Request) {
       code: vnp_ResponseCode,
     });
 
-    // Redirect
+    // Redirect to frontend
+    const frontendUrl = process.env.NEXTAUTH_URL || 'http://localhost:3000';
     return redirect(
-      `${process.env.NEXTAUTH_URL}/payment/${isSuccess ? 'success' : 'failed'}`
+      `${frontendUrl}/checkout-success?status=${isSuccess ? 'success' : 'failed'}&method=vnpay&orderId=${orderId}`
     );
 
   } catch (error) {
     console.error('[VNPay Return Error]:', error);
-    return redirect(`${process.env.NEXTAUTH_URL}/payment/failed`);
+    const frontendUrl = process.env.NEXTAUTH_URL || 'http://localhost:5173';
+    return redirect(`${frontendUrl}/checkout-success?status=failed&method=vnpay`);
   }
 }

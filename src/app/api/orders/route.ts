@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sql } from '@/lib/db'
 import { getUserIdFromToken } from '@/lib/auth-utils'
 import { createPaymentUrl } from '@/lib/vnpay'
+import { createMoMoPayment } from '@/lib/momo'
 
 export async function GET(request: NextRequest) {
   try {
@@ -70,6 +71,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Normalize payment method
+    const normalizedPayment = (paymentMethod || 'cod').toUpperCase()
+    const validMethods = ['COD', 'VNPAY', 'MOMO']
+    if (!validMethods.includes(normalizedPayment)) {
+      return NextResponse.json(
+        { success: false, error: `Invalid payment method: ${paymentMethod}` },
+        { status: 400 }
+      )
+    }
 
     // 1. Stock Check
     for (const item of items) {
@@ -88,7 +98,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 2. Create the order
+    // 2. Determine initial status
+    // COD orders are auto-confirmed immediately (no admin needed)
+    const initialStatus = normalizedPayment === 'COD' ? 'confirmed' : 'pending'
+
+    // 3. Create the order
     await sql`
       INSERT INTO orders (
         user_id, status, subtotal, shipping_fee, total, 
@@ -96,8 +110,8 @@ export async function POST(request: NextRequest) {
         placed_at, updated_at
       )
       VALUES (
-        ${userId}, 'pending', ${subtotal}, ${shippingFee}, ${total}, 
-        ${paymentMethod}, 'PENDING', ${shippingAddressId}, 
+        ${userId}, ${initialStatus}, ${subtotal}, ${shippingFee}, ${total}, 
+        ${normalizedPayment}, 'PENDING', ${shippingAddressId}, 
         NOW(), NOW()
       )
     `
@@ -110,7 +124,7 @@ export async function POST(request: NextRequest) {
     `
     const orderId = newOrders[0].id
 
-    // 3. Create order items and Reduce Stock
+    // 4. Create order items and Reduce Stock
     for (const item of items) {
       const itemTotal = item.product.price * item.quantity
       // Insert item
@@ -126,16 +140,16 @@ export async function POST(request: NextRequest) {
       `
     }
 
-    // 4. Clear Cart
-    // First find the cart ID
+    // 5. Clear Cart
     const carts = await sql`SELECT id FROM carts WHERE user_id = ${userId}`
     if (carts.length > 0) {
       await sql`DELETE FROM cart_items WHERE cart_id = ${carts[0].id}`
     }
 
-    // 5. Handle Payment Flow
+    // 6. Handle Payment Flow
     let paymentUrl = null
-    if (paymentMethod === 'VNPAY' || paymentMethod === 'vnpay') {
+
+    if (normalizedPayment === 'VNPAY') {
       try {
         paymentUrl = createPaymentUrl({
           amount: total,
@@ -146,6 +160,30 @@ export async function POST(request: NextRequest) {
       } catch (err: any) {
         console.error('VNPay error:', err)
       }
+    } else if (normalizedPayment === 'MOMO') {
+      try {
+        // MoMo requires unique orderId per call, prefix with timestamp
+        const momoOrderId = `${orderId}_${Date.now()}`
+        const result = await createMoMoPayment({
+          orderId: momoOrderId,
+          amount: Math.round(total),
+          orderInfo: `Thanh toan don hang ${orderId}`,
+        })
+
+        if (result.success && result.payUrl) {
+          paymentUrl = result.payUrl
+          // Save MoMo request ID for transaction tracking
+          await sql`
+            UPDATE orders 
+            SET momo_request_id = ${result.requestId}
+            WHERE id = ${orderId}
+          `
+        } else {
+          console.error('MoMo payment creation failed:', result.error)
+        }
+      } catch (err: any) {
+        console.error('MoMo error:', err)
+      }
     }
 
     return NextResponse.json({
@@ -153,7 +191,7 @@ export async function POST(request: NextRequest) {
       data: {
         orderId,
         paymentUrl,
-        message: paymentUrl ? 'Redirecting to payment' : 'Order placed successfully'
+        message: paymentUrl ? 'Redirecting to payment' : 'Order placed and confirmed successfully'
       }
     })
   } catch (error: any) {
@@ -168,5 +206,3 @@ export async function POST(request: NextRequest) {
     )
   }
 }
-
-

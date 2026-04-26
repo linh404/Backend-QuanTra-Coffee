@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!paymentMethod || !['COD', 'VNPAY'].includes(paymentMethod)) {
+    const normalizedPayment = (paymentMethod || '').toUpperCase()
+    if (!normalizedPayment || !['COD', 'VNPAY', 'MOMO'].includes(normalizedPayment)) {
       console.log('Invalid payment method:', paymentMethod)
       return NextResponse.json(
         { 
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user ID from token
-    const userId = getUserIdFromToken(request)
+    const userId = await getUserIdFromToken(request)
     
     if (!userId) {
       return NextResponse.json(
@@ -46,9 +47,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get cart with items
-    const carts = await sql`
+    const carts = (await sql`
       SELECT * FROM carts WHERE user_id = ${userId}
-    `
+    `) as any[]
 
     if (carts.length === 0) {
       return NextResponse.json(
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     const cart = carts[0]
 
     // Get cart items with product details
-    const items = await sql`
+    const items = (await sql`
       SELECT 
         ci.*,
         p.name as product_name,
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
       FROM cart_items ci
       JOIN products p ON ci.product_id = p.id
       WHERE ci.cart_id = ${cart.id}
-    `
+    `) as any[]
 
     if (items.length === 0) {
       return NextResponse.json(
@@ -93,9 +94,9 @@ export async function POST(request: NextRequest) {
 
     // Get shipping address
     console.log('Getting shipping address:', { addressId, userId })
-    const address = await sql`
+    const address = (await sql`
       SELECT * FROM user_addresses WHERE id = ${addressId} AND user_id = ${userId}
-    `
+    `) as any[]
     console.log('Found address:', address)
 
     if (address.length === 0) {
@@ -132,11 +133,11 @@ export async function POST(request: NextRequest) {
       )
       VALUES (
         ${userId}, 
-        'pending', 
+        ${normalizedPayment === 'COD' ? 'confirmed' : 'pending'}, 
         ${subtotal}, 
         ${shippingFee}, 
         ${total},
-        ${paymentMethod},
+        ${normalizedPayment},
         'PENDING',
         ${addressId},
         NOW(), 
@@ -144,25 +145,25 @@ export async function POST(request: NextRequest) {
       )
     `
 
-    const createdOrders = await sql`
+    const createdOrders = (await sql`
       SELECT *
       FROM orders
       WHERE user_id = ${userId}
       ORDER BY placed_at DESC, id DESC
       LIMIT 1
-    `
+    `) as any[]
 
     const order = createdOrders[0]
 
     // Create order items
-    const orderItems = await Promise.all(
-      items.map(item =>
-        sql`
-          INSERT INTO order_items (order_id, product_id, qty, unit_price, total, updated_at)
-          VALUES (${order.id}, ${item.product_id}, ${item.qty}, ${item.unit_price_snapshot}, ${parseFloat(item.unit_price_snapshot) * item.qty}, NOW())
-        `
-      )
-    )
+    for (const item of items) {
+      const itemPrice = parseFloat(item.unit_price_snapshot)
+      const itemTotal = itemPrice * item.qty
+      await sql`
+        INSERT INTO order_items (order_id, product_id, qty, unit_price, total, updated_at)
+        VALUES (${order.id}, ${item.product_id}, ${item.qty}, ${itemPrice}, ${itemTotal}, NOW())
+      `
+    }
 
     // Clear cart
     await sql`
@@ -173,7 +174,7 @@ export async function POST(request: NextRequest) {
       success: true,
       data: {
         order,
-        orderItems: orderItems.map(item => item[0])
+        message: 'Order created successfully'
       }
     })
   } catch (error: any) {

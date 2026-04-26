@@ -88,13 +88,31 @@ const tools = [
   },
 ];
 
-const systemPrompt = `Ban la tro ly ao cua Green Store - cua hang chuyen cung cap nong san Viet.
-Nhiem vu:
-1. Khi khach hoi ve san pham, gia ca, danh muc, ngan sach, khoang gia hoac muon xem goi y mua hang, hay goi tool de lay du lieu thuc.
-2. Neu tin nhan hien tai la cau noi tiep tu ngu canh truoc do, hay su dung lich su hoi thoai de suy ra nhu cau va tiep tuc goi tool. Khong tra loi chung chung khi co the truy van du lieu that.
-3. Khong bia so lieu hoac san pham. Neu thieu thong tin va khong the suy ra tu lich su, hay hoi lai khach hang mot cau ngan gon.
-4. Tra loi toi da 5 san pham. Neu san pham dang giam gia, uu tien hien thi gia giam.
-5. Tra loi than thien, lich su va huu ich.`;
+const CAFE_NAME = process.env.CAFE_NAME || "Quán Trà Coffee";
+const CAFE_ADDRESS = process.env.CAFE_ADDRESS || "Đang cập nhật";
+const CAFE_HOURS = process.env.CAFE_HOURS || "Đang cập nhật";
+const CAFE_HOTLINE = process.env.CAFE_HOTLINE || "Đang cập nhật";
+const CAFE_WIFI = process.env.CAFE_WIFI || "Đang cập nhật";
+const CAFE_DELIVERY_POLICY = process.env.CAFE_DELIVERY_POLICY || "Đang cập nhật";
+const CAFE_PAYMENT_METHODS = process.env.CAFE_PAYMENT_METHODS || "Đang cập nhật";
+const CAFE_EVENTS_POLICY = process.env.CAFE_EVENTS_POLICY || "Đang cập nhật";
+
+const systemPrompt = `Bạn là trợ lý ảo của ${CAFE_NAME} - cửa hàng chuyên cung cấp cà phê chất lượng cao, trà và các thiết bị pha chế.
+Nhiệm vụ:
+1. Khi khách hỏi về sản phẩm, giá cả, danh mục, ngân sách, hoặc muốn xem gợi ý mua hàng, BẠN PHẢI GỌI TOOL NGAY LẬP TỨC để lấy dữ liệu. TUYỆT ĐỐI KHÔNG trả lời các câu như "Vui lòng đợi một chút để tôi kiểm tra..." mà hãy thực hiện gọi tool luôn.
+2. Nếu tin nhắn hiện tại liên quan đến ngữ cảnh trước đó, hãy sử dụng lịch sử hội thoại để suy ra nhu cầu và tiếp tục gọi tool. Không trả lời chung chung khi có thể truy vấn dữ liệu thật.
+3. Không tự bịa số liệu hoặc sản phẩm. Nếu thiếu thông tin, hãy hỏi lại khách hàng một cách ngắn gọn.
+4. Ưu tiên hiển thị tối đa 5 sản phẩm. Nếu sản phẩm đang giảm giá, hãy nhấn mạnh giá giảm.
+5. Trả lời thân thiện, lịch sự và chuyên nghiệp theo phong cách phục vụ của ${CAFE_NAME}.
+
+THÔNG TIN PHỔ BIẾN VỀ ${CAFE_NAME.toUpperCase()} (Dùng để trả lời trực tiếp không cần gọi tool):
+- Địa chỉ quán: ${CAFE_ADDRESS}
+- Giờ mở cửa: ${CAFE_HOURS}
+- Hotline liên hệ: ${CAFE_HOTLINE}
+- Wifi tại quán: ${CAFE_WIFI}
+- Chính sách giao hàng: ${CAFE_DELIVERY_POLICY}
+- Thanh toán: ${CAFE_PAYMENT_METHODS}
+- Nhận đặt tiệc/sự kiện: ${CAFE_EVENTS_POLICY}`;
 
 type ConversationMessage = {
   role: 'user' | 'assistant';
@@ -127,15 +145,19 @@ export async function callGemini(message: string, conversationHistory: Conversat
 
   try {
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.5-flash-lite',
+      model: process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite',
+      systemInstruction: {
+        role: "system",
+        parts: [{ text: systemPrompt }]
+      },
       tools: [{ functionDeclarations: tools as never }],
     });
 
     const chat = model.startChat();
     const conversationContext = buildConversationContext(conversationHistory);
     const prompt = conversationContext
-      ? `${systemPrompt}\n\nLich su hoi thoai gan day:\n${conversationContext}\n\nTin nhan moi nhat cua khach hang: ${message}`
-      : `${systemPrompt}\n\nKhach hang: ${message}`;
+      ? `Lịch sử hội thoại gần đây:\n${conversationContext}\n\nTin nhắn mới nhất của khách hàng: ${message}`
+      : `Khách hàng: ${message}`;
 
     const result = await chat.sendMessage(prompt);
     const response = result.response;
