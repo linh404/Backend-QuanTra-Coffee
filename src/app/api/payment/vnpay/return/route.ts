@@ -36,7 +36,7 @@ export async function GET(request: Request) {
     await sql`
       UPDATE orders 
       SET 
-        payment_status = ${isSuccess ? 'PAID' : 'FAILED'},
+        payment_status = ${isSuccess ? 'SUCCESS' : 'FAILED'},
         status = ${isSuccess ? 'paid' : 'cancelled'},
         paid_at = ${isSuccess ? new Date() : null},
         cancelled_at = ${isSuccess ? null : new Date()},

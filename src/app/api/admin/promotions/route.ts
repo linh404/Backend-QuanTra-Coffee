@@ -4,7 +4,7 @@ import { getUserFromToken } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -27,8 +27,12 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get all products that are on sale (is_sale = true)
-    // First, let's check if the products table exists and has the required columns
+    const { searchParams } = new URL(request.url)
+    const limit = Number(searchParams.get('limit')) || 5
+    const page = Number(searchParams.get('page')) || 1
+    const offset = (page - 1) * limit
+
+    // Get all products to allow toggling promotions
     try {
       const promotions = await sql`
         SELECT 
@@ -46,22 +50,29 @@ export async function GET(request: NextRequest) {
           c.name as category_name
         FROM products p
         LEFT JOIN categories c ON p.category_id = c.id
-        WHERE p.is_sale = true
         ORDER BY p.created_at DESC
+        LIMIT ${limit} OFFSET ${offset}
       `
+
+      const countResult = await sql`SELECT COUNT(*) as total FROM products`
+      const total = Number(countResult[0].total)
 
       return NextResponse.json({
         success: true,
-        data: promotions || []
+        data: promotions || [],
+        pagination: {
+          page,
+          limit,
+          total,
+          totalPages: Math.ceil(total / limit)
+        }
       })
     } catch (dbError) {
       console.error('Database error:', dbError)
-      
-      // If there's a database error, return empty array instead of failing
       return NextResponse.json({
         success: true,
         data: [],
-        message: 'No products on sale found or database error'
+        pagination: { page: 1, limit: 5, total: 0, totalPages: 0 }
       })
     }
   } catch (error) {
@@ -78,7 +89,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -141,7 +152,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(

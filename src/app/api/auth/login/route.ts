@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     // Find user
     const users = await sql`
-      SELECT id, email, password_hash, name, role 
+      SELECT id, email, password_hash, name, phone, role 
       FROM users 
       WHERE email = ${email}
     `
@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
           id: user.id,
           email: user.email,
           name: user.name,
+          phone: user.phone,
           role: user.role
         },
         token

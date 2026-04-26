@@ -7,7 +7,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json({ success: false, error: 'Yêu cầu đăng nhập' }, { status: 401 })
@@ -23,15 +23,13 @@ export async function PATCH(
       return NextResponse.json({ success: false, error: 'Yêu cầu quyền Admin' }, { status: 403 })
     }
 
-    /**
-     * SỬA GIÁ TRỊ TẠI ĐÂY ĐỂ KHỚP VỚI ENUM TRONG DATABASE
-     * Thay 'confirmed' bằng 'paid' vì Database báo lỗi không nhận 'confirmed'
-     */
     let newStatus: string = ''
     switch (action) {
       case 'confirm': 
+        newStatus = 'confirmed';
+        break;
       case 'pay': 
-        newStatus = 'paid'; // Sử dụng 'paid' thay vì 'confirmed'
+        newStatus = 'paid'; 
         break;
       case 'ship':    
         newStatus = 'shipped'; 
@@ -51,8 +49,14 @@ export async function PATCH(
       UPDATE orders 
       SET 
         status = ${newStatus},
-        payment_status = CASE WHEN ${action} = 'pay' THEN 'PAID' ELSE payment_status END,
-        paid_at = CASE WHEN ${action} = 'pay' THEN NOW() ELSE paid_at END,
+        payment_status = CASE 
+          WHEN ${action} = 'pay' THEN 'SUCCESS' 
+          ELSE payment_status 
+        END,
+        paid_at = CASE 
+          WHEN ${action} = 'pay' OR (${action} = 'confirm' AND payment_status = 'SUCCESS') THEN NOW() 
+          ELSE paid_at 
+        END,
         shipped_at = CASE WHEN ${action} = 'ship' THEN NOW() ELSE shipped_at END,
         delivered_at = CASE WHEN ${action} = 'deliver' THEN NOW() ELSE delivered_at END,
         cancelled_at = CASE WHEN ${action} = 'cancel' THEN NOW() ELSE cancelled_at END,

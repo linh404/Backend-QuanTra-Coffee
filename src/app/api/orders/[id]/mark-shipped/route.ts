@@ -11,7 +11,7 @@ export async function POST(
     const orderId = parseInt(id)
     
     // Check authentication
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(

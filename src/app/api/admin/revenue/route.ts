@@ -4,7 +4,7 @@ import { getUserFromToken } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -35,49 +35,50 @@ export async function GET(request: NextRequest) {
     const totalRevenueResult = await sql`
       SELECT COALESCE(SUM(total), 0) as total_revenue
       FROM orders 
-      WHERE status = 'delivered'
+      WHERE payment_status = 'SUCCESS'
     `
 
     // Calculate monthly revenue (current month, delivered orders)
     const monthlyRevenueResult = await sql`
       SELECT COALESCE(SUM(total), 0) as monthly_revenue
       FROM orders 
-      WHERE status = 'delivered'
-        AND YEAR(delivered_at) = ${currentYear}
-        AND MONTH(delivered_at) = ${currentMonth}
+      WHERE payment_status = 'SUCCESS'
+        AND YEAR(paid_at) = ${currentYear}
+        AND MONTH(paid_at) = ${currentMonth}
     `
 
     // Calculate yearly revenue (current year, delivered orders)
     const yearlyRevenueResult = await sql`
       SELECT COALESCE(SUM(total), 0) as yearly_revenue
       FROM orders 
-      WHERE status = 'delivered'
-        AND YEAR(delivered_at) = ${currentYear}
+      WHERE payment_status = 'SUCCESS'
+        AND YEAR(paid_at) = ${currentYear}
     `
 
     // Get additional stats for context
     const orderStatsResult = await sql`
       SELECT 
         COUNT(*) as total_orders,
-        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered_orders,
-        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending_orders,
-        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid_orders,
-        COUNT(CASE WHEN status = 'shipped' THEN 1 END) as shipped_orders,
-        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled_orders
+        COUNT(CASE WHEN status = 'delivered' THEN 1 END) as delivered,
+        COUNT(CASE WHEN status = 'pending' THEN 1 END) as pending,
+        COUNT(CASE WHEN status = 'confirmed' THEN 1 END) as confirmed,
+        COUNT(CASE WHEN status = 'paid' THEN 1 END) as paid,
+        COUNT(CASE WHEN status = 'shipped' THEN 1 END) as shipped,
+        COUNT(CASE WHEN status = 'cancelled' THEN 1 END) as cancelled
       FROM orders
     `
 
     // Get monthly breakdown for chart (last 12 months)
     const monthlyBreakdownResult = await sql`
       SELECT 
-        YEAR(delivered_at) as year,
-        MONTH(delivered_at) as month,
+        YEAR(paid_at) as year,
+        MONTH(paid_at) as month,
         COALESCE(SUM(total), 0) as revenue,
         COUNT(*) as order_count
       FROM orders 
-      WHERE status = 'delivered'
-        AND delivered_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
-      GROUP BY YEAR(delivered_at), MONTH(delivered_at)
+      WHERE payment_status = 'SUCCESS'
+        AND paid_at >= DATE_SUB(CURDATE(), INTERVAL 12 MONTH)
+      GROUP BY YEAR(paid_at), MONTH(paid_at)
       ORDER BY year DESC, month DESC
     `
 
@@ -86,12 +87,13 @@ export async function GET(request: NextRequest) {
       monthlyRevenue: parseFloat(monthlyRevenueResult[0]?.monthly_revenue || '0'),
       yearlyRevenue: parseFloat(yearlyRevenueResult[0]?.yearly_revenue || '0'),
       orderStats: {
-        totalOrders: parseInt(orderStatsResult[0]?.total_orders || '0'),
-        deliveredOrders: parseInt(orderStatsResult[0]?.delivered_orders || '0'),
-        pendingOrders: parseInt(orderStatsResult[0]?.pending_orders || '0'),
-        paidOrders: parseInt(orderStatsResult[0]?.paid_orders || '0'),
-        shippedOrders: parseInt(orderStatsResult[0]?.shipped_orders || '0'),
-        cancelledOrders: parseInt(orderStatsResult[0]?.cancelled_orders || '0')
+        total: parseInt(orderStatsResult[0]?.total_orders || '0'),
+        delivered: parseInt(orderStatsResult[0]?.delivered || '0'),
+        pending: parseInt(orderStatsResult[0]?.pending || '0'),
+        confirmed: parseInt(orderStatsResult[0]?.confirmed || '0'),
+        paid: parseInt(orderStatsResult[0]?.paid || '0'),
+        shipped: parseInt(orderStatsResult[0]?.shipped || '0'),
+        cancelled: parseInt(orderStatsResult[0]?.cancelled || '0')
       },
       monthlyBreakdown: monthlyBreakdownResult.map(row => ({
         year: parseInt(row.year),

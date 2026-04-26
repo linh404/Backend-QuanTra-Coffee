@@ -18,7 +18,7 @@ export async function GET(request: Request) {
     }
 
     const user = await sql`
-      SELECT id, email, name, role, created_at, updated_at
+      SELECT id, email, name, phone, role, created_at, updated_at
       FROM users
       WHERE id = ${decoded.userId}
     `
@@ -33,9 +33,22 @@ export async function GET(request: Request) {
       )
     }
 
+    const userResult = user[0] as any
+    
+    const defaultAddress = await sql`
+      SELECT id, name, phone, line1, city, district, ward
+      FROM user_addresses
+      WHERE user_id = ${decoded.userId} AND is_default = 1
+      LIMIT 1
+    `
+    
+    if (defaultAddress && defaultAddress.length > 0) {
+      userResult.defaultAddress = defaultAddress[0]
+    }
+
     return NextResponse.json({
       success: true,
-      data: user[0]
+      data: userResult
     })
   } catch (error) {
     console.error('Error fetching user:', error)
@@ -63,10 +76,7 @@ export async function PUT(request: Request) {
       )
     }
 
-    const formData = await request.formData()
-    const name = formData.get('name') as string
-    const currentPassword = formData.get('currentPassword') as string | null
-    const newPassword = formData.get('newPassword') as string | null
+    const { name, phone, currentPassword, newPassword } = await request.json()
     
     // Get current user data
     const currentUser = await sql`
@@ -120,6 +130,11 @@ export async function PUT(request: Request) {
       values.push(name)
     }
 
+    if (phone !== undefined) {
+      updates.push('phone = ?')
+      values.push(phone)
+    }
+
     if (newPassword) {
       const hashedPassword = await bcrypt.hash(newPassword, 12)
       updates.push('password_hash = ?')
@@ -137,7 +152,7 @@ export async function PUT(request: Request) {
     }
 
     const updatedUser = await sql`
-      SELECT id, email, name, role, created_at, updated_at
+      SELECT id, email, name, phone, role, created_at, updated_at
       FROM users
       WHERE id = ${decoded.userId}
       LIMIT 1

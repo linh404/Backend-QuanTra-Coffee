@@ -4,7 +4,7 @@ import { getUserFromToken } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -64,6 +64,8 @@ export async function GET(request: NextRequest) {
           shipped_at: order.shipped_at,
           delivered_at: order.delivered_at,
           cancelled_at: order.cancelled_at,
+          payment_method: order.payment_method,
+          payment_status: order.payment_status,
           payment_proof_url: order.payment_proof_url,
           shipping_provider: order.shipping_provider,
           tracking_number: order.tracking_number,

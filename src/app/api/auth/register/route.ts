@@ -5,7 +5,7 @@ import jwt from 'jsonwebtoken'
 
 export async function POST(request: Request) {
   try {
-  const { email, password, name, role = 'buyer', line1, city, district, ward } = await request.json()
+  const { email, password, name, phone, role = 'buyer', line1, city, district, ward } = await request.json()
 
     if (!email || !password || !name) {
       return NextResponse.json(
@@ -37,12 +37,12 @@ export async function POST(request: Request) {
 
     // Create user
     await sql`
-      INSERT INTO users (email, password_hash, name, role, created_at, updated_at)
-      VALUES (${email}, ${passwordHash}, ${name}, ${role}, NOW(), NOW())
+      INSERT INTO users (email, password_hash, name, phone, role, created_at, updated_at)
+      VALUES (${email}, ${passwordHash}, ${name}, ${phone}, ${role}, NOW(), NOW())
     `
 
     const createdUsers = await sql`
-      SELECT id, email, name, role
+      SELECT id, email, name, phone, role
       FROM users
       WHERE email = ${email}
       LIMIT 1
@@ -54,8 +54,8 @@ export async function POST(request: Request) {
     if (line1 && city && district && ward) {
       try {
         await sql`
-          INSERT INTO user_addresses (user_id, line1, city, district, ward, is_default, created_at, updated_at)
-          VALUES (${user.id}, ${line1}, ${city}, ${district}, ${ward}, true, NOW(), NOW())
+          INSERT INTO user_addresses (user_id, name, phone, line1, city, district, ward, is_default, created_at, updated_at)
+          VALUES (${user.id}, ${name}, ${phone}, ${line1}, ${city}, ${district}, ${ward}, true, NOW(), NOW())
         `
       } catch (err) {
         console.error('Failed to save user address during registration:', err)
@@ -76,6 +76,7 @@ export async function POST(request: Request) {
           id: user.id,
           email: user.email,
           name: user.name,
+          phone: user.phone,
           role: user.role
         },
         token

@@ -4,7 +4,7 @@ import { getUserFromToken } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -27,39 +27,49 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    const { searchParams } = new URL(request.url)
+    const limit = Number(searchParams.get('limit')) || 5
+    const page = Number(searchParams.get('page')) || 1
+    const offset = (page - 1) * limit
+
     // Get all products with category information
     const products = await sql`
       SELECT 
         p.id,
         p.name,
         p.slug,
-        p.short_description,
+        p.short_description as shortDescription,
         p.description,
         p.price,
-        p.sale_price,
-        p.is_sale,
+        p.sale_price as salePrice,
+        p.is_sale as isSale,
         p.brand,
-        p.category_id,
-        p.image_url,
+        p.category_id as categoryId,
+        p.image_url as imageUrl,
         p.stock,
-        p.is_active,
-        p.created_at,
-        p.updated_at,
-        c.name as category_name
+        p.is_active as isActive,
+        p.created_at as createdAt,
+        p.updated_at as updatedAt,
+        c.name as categoryName
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       ORDER BY p.created_at DESC
+      LIMIT ${limit} OFFSET ${offset}
     `
+
+    const countResult = await sql`SELECT COUNT(*) as total FROM products`
+    const total = Number(countResult[0].total)
+
 
     // Get images and tags for each product
     const productsWithRelations = await Promise.all(
       products.map(async (product) => {
         const [images, tags] = await Promise.all([
           sql`
-            SELECT id, url, is_main
+            SELECT id, url, is_main as isMain
             FROM product_images
             WHERE product_id = ${product.id}
-            ORDER BY is_main DESC, id ASC
+            ORDER BY isMain DESC, id ASC
           `,
           sql`
             SELECT t.id, t.name, t.slug
@@ -79,7 +89,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      data: productsWithRelations
+      data: productsWithRelations,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
     })
   } catch (error) {
     console.error('Error fetching admin products:', error)
@@ -95,7 +111,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -178,9 +194,9 @@ export async function POST(request: NextRequest) {
 
     const createdProduct = await sql`
       SELECT 
-        id, name, slug, brand, short_description, description, category_id, 
-        is_active, price, sale_price, is_sale, image_url, stock, 
-        created_at, updated_at
+        id, name, slug, brand, short_description as shortDescription, description, category_id as categoryId, 
+        is_active as isActive, price, sale_price as salePrice, is_sale as isSale, image_url as imageUrl, stock, 
+        created_at as createdAt, updated_at as updatedAt
       FROM products
       WHERE slug = ${slug}
       LIMIT 1
@@ -211,7 +227,7 @@ export async function POST(request: NextRequest) {
 
 export async function PUT(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(
@@ -319,9 +335,9 @@ export async function PUT(request: NextRequest) {
 
     const updatedProduct = await sql`
       SELECT 
-        id, name, slug, brand, short_description, description, category_id, 
-        is_active, price, sale_price, is_sale, image_url, stock, 
-        created_at, updated_at
+        id, name, slug, brand, short_description as shortDescription, description, category_id as categoryId, 
+        is_active as isActive, price, sale_price as salePrice, is_sale as isSale, image_url as imageUrl, stock, 
+        created_at as createdAt, updated_at as updatedAt
       FROM products
       WHERE id = ${id}
       LIMIT 1
@@ -342,10 +358,10 @@ export async function PUT(request: NextRequest) {
     // Get images and tags
     const [images, tags] = await Promise.all([
       sql`
-        SELECT id, url, is_main
+        SELECT id, url, is_main as isMain
         FROM product_images
         WHERE product_id = ${id}
-        ORDER BY is_main DESC, id ASC
+        ORDER BY isMain DESC, id ASC
       `,
       sql`
         SELECT t.id, t.name, t.slug
@@ -379,7 +395,7 @@ export async function PUT(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user) {
       return NextResponse.json(

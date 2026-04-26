@@ -78,7 +78,7 @@ export async function POST(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = getUserFromToken(request)
+    const user = await getUserFromToken(request)
     
     if (!user || user.role !== 'admin') {
       return NextResponse.json(
@@ -179,63 +179,4 @@ export async function POST(
   }
 }
 
-/**
- * DELETE /api/admin/products/[id]/tags/[tagId]
- * Xóa tag khỏi product
- */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string; tagId: string }> }
-) {
-  try {
-    const user = getUserFromToken(request)
-    
-    if (!user || user.role !== 'admin') {
-      return NextResponse.json(
-        { success: false, error: 'Admin access required' },
-        { status: 403 }
-      )
-    }
 
-    const { id, tagId } = await params
-    const productId = parseInt(id)
-    const tagIdNum = parseInt(tagId)
-
-    if (!productId || !tagIdNum) {
-      return NextResponse.json(
-        { success: false, error: 'Invalid product or tag ID' },
-        { status: 400 }
-      )
-    }
-
-    // Kiểm tra mapping tồn tại
-    const mapping = await sql`
-      SELECT id FROM product_tags_map
-      WHERE product_id = ${productId} AND tag_id = ${tagIdNum}
-    `
-
-    if (mapping.length === 0) {
-      return NextResponse.json(
-        { success: false, error: 'Tag not found for this product' },
-        { status: 404 }
-      )
-    }
-
-    // Xóa mapping
-    await sql`
-      DELETE FROM product_tags_map
-      WHERE product_id = ${productId} AND tag_id = ${tagIdNum}
-    `
-
-    return NextResponse.json({
-      success: true,
-      message: 'Tag removed successfully'
-    })
-  } catch (error) {
-    console.error('Error deleting product tag:', error)
-    return NextResponse.json(
-      { success: false, error: 'Failed to delete product tag' },
-      { status: 500 }
-    )
-  }
-}
