@@ -4,7 +4,7 @@ import { getUserIdFromToken } from '@/lib/auth-utils'
 
 export async function GET(request: NextRequest) {
   try {
-    const userId = getUserIdFromToken(request)
+    const userId = await getUserIdFromToken(request)
     
     if (!userId) {
       return NextResponse.json(
@@ -17,7 +17,19 @@ export async function GET(request: NextRequest) {
     }
     
     const addresses = await sql`
-      SELECT * FROM user_addresses 
+      SELECT 
+        id,
+        user_id as userId,
+        name,
+        phone,
+        line1,
+        city,
+        district,
+        ward,
+        is_default as isDefault,
+        created_at as createdAt,
+        updated_at as updatedAt
+      FROM user_addresses 
       WHERE user_id = ${userId}
       ORDER BY is_default DESC, created_at DESC
     `
@@ -26,6 +38,7 @@ export async function GET(request: NextRequest) {
       success: true,
       data: addresses
     })
+
   } catch (error) {
     console.error('Error fetching addresses:', error)
     return NextResponse.json(
@@ -40,7 +53,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = getUserIdFromToken(request)
+    const userId = await getUserIdFromToken(request)
     
     if (!userId) {
       return NextResponse.json(
@@ -52,7 +65,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { line1, city, district, ward, isDefault } = await request.json()
+    const { name, phone, line1, city, district, ward, isDefault } = await request.json()
     
     // Ensure isDefault is a boolean
     const isDefaultBoolean = Boolean(isDefault)
@@ -67,9 +80,10 @@ export async function POST(request: NextRequest) {
     }
 
     await sql`
-      INSERT INTO user_addresses (user_id, line1, city, district, ward, is_default, created_at, updated_at)
-      VALUES (${userId}, ${line1}, ${city}, ${district}, ${ward}, ${isDefaultBoolean}, NOW(), NOW())
+      INSERT INTO user_addresses (user_id, name, phone, line1, city, district, ward, is_default, created_at, updated_at)
+      VALUES (${userId}, ${name}, ${phone}, ${line1}, ${city}, ${district}, ${ward}, ${isDefaultBoolean}, NOW(), NOW())
     `
+
 
     const addresses = await sql`
       SELECT *
