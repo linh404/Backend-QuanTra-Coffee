@@ -54,18 +54,29 @@ export async function GET(request: Request) {
       switch (parsed.sort) {
         case 'price_desc':
           return sql`ORDER BY p.price DESC, p.id DESC`;
+        case 'price_asc':
+          return sql`ORDER BY p.price ASC, p.id DESC`;
         case 'name_asc':
           return sql`ORDER BY p.name ASC, p.id DESC`;
         case 'name_desc':
           return sql`ORDER BY p.name DESC, p.id DESC`;
-        case 'price_asc':
+        case 'discount_desc':
+          return sql`ORDER BY (p.price - COALESCE(p.sale_price, p.price)) DESC, p.id DESC`;
+        case 'newest':
+          return sql`ORDER BY p.created_at DESC, p.id DESC`;
+        case 'random':
+          return sql`ORDER BY RAND()`;
+        case 'best_selling':
+          return sql`ORDER BY COALESCE(sales.total_qty, 0) DESC, p.id DESC`;
+        case 'top_rated':
+          return sql`ORDER BY COALESCE(reviews.avg_rating, 0) DESC, p.id DESC`;
         default:
-          return sql`ORDER BY p.price ASC, p.id DESC`;
+          return sql`ORDER BY p.id DESC`;
       }
     })();
 
     const searchClause = rawSearch
-      ? sql`AND LOWER(p.name) LIKE LOWER(${searchTerm})`
+      ? sql`AND (LOWER(p.name) LIKE LOWER(${searchTerm}) OR LOWER(p.short_description) LIKE LOWER(${searchTerm}))`
       : sql``;
 
     const products = await sql`
@@ -82,12 +93,25 @@ export async function GET(request: Request) {
         p.image_url,
         p.category_id,
         c.name AS category_name,
-        c.slug AS category_slug
+        c.slug AS category_slug,
+        COALESCE(sales.total_qty, 0) as total_sold,
+        COALESCE(reviews.avg_rating, 0) as rating
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
+      LEFT JOIN (
+        SELECT product_id, SUM(qty) as total_qty 
+        FROM order_items 
+        GROUP BY product_id
+      ) sales ON sales.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id, AVG(rating) as avg_rating 
+        FROM product_reviews 
+        GROUP BY product_id
+      ) reviews ON reviews.product_id = p.id
       WHERE 1 = 1
       ${searchClause}
       ${parsed.category_id ? sql`AND p.category_id = ${Number(parsed.category_id)}` : sql``}
+      ${parsed.category_name ? sql`AND (LOWER(c.name) LIKE LOWER(${`%${parsed.category_name}%`}) OR LOWER(c.slug) LIKE LOWER(${`%${parsed.category_name}%`}))` : sql``}
       ${parsed.price_min != null ? sql`AND p.price >= ${parsed.price_min}` : sql``}
       ${parsed.price_max != null ? sql`AND p.price <= ${parsed.price_max}` : sql``}
       ${parsed.in_stock_only ? sql`AND p.stock > 0` : sql``}
@@ -98,9 +122,11 @@ export async function GET(request: Request) {
     const countResult = await sql`
       SELECT COUNT(*) AS total
       FROM products p
+      LEFT JOIN categories c ON c.id = p.category_id
       WHERE 1 = 1
       ${searchClause}
       ${parsed.category_id ? sql`AND p.category_id = ${Number(parsed.category_id)}` : sql``}
+      ${parsed.category_name ? sql`AND (LOWER(c.name) LIKE LOWER(${`%${parsed.category_name}%`}) OR LOWER(c.slug) LIKE LOWER(${`%${parsed.category_name}%`}))` : sql``}
       ${parsed.price_min != null ? sql`AND p.price >= ${parsed.price_min}` : sql``}
       ${parsed.price_max != null ? sql`AND p.price <= ${parsed.price_max}` : sql``}
       ${parsed.in_stock_only ? sql`AND p.stock > 0` : sql``}

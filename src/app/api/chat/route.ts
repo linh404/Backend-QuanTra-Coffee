@@ -75,14 +75,23 @@ export async function POST(request: NextRequest) {
             if (args.price_min != null && !isNaN(Number(args.price_min))) params.set('price_min', String(args.price_min));
             if (args.price_max != null && !isNaN(Number(args.price_max))) params.set('price_max', String(args.price_max));
             if (args.in_stock_only) params.set('in_stock_only', 'true');
+            if (args.sort && typeof args.sort === 'string') params.set('sort', args.sort);
             if (args.page != null && !isNaN(Number(args.page))) params.set('page', String(args.page));
 
             const searchRes = await fetch(`${getBaseUrl()}/api/products/search?${params.toString()}`);
             const searchData = await searchRes.json();
             products = Array.isArray(searchData) ? searchData : (searchData.data || []);
-            reply = products.length > 0 
-              ? `Tôi tìm thấy ${products.length} sản phẩm phù hợp với yêu cầu của bạn:` 
-              : 'Rất tiếc, hiện tại tôi chưa tìm thấy sản phẩm nào hoàn toàn phù hợp. Bạn có muốn xem các sản phẩm tương tự không?';
+            
+            if (products.length > 0) {
+              reply = `Tôi tìm thấy ${products.length} sản phẩm phù hợp với yêu cầu của bạn:`;
+            } else {
+              const searchTerms = [
+                args.q, 
+                args.category_name, 
+                args.price_max ? `dưới ${formatVnd(Number(args.price_max))}` : null
+              ].filter(Boolean).join(', ');
+              reply = `Rất tiếc, tôi chưa tìm thấy sản phẩm nào phù hợp với "${searchTerms}". Bạn có muốn tôi tìm kiếm rộng hơn hoặc gợi ý các sản phẩm bán chạy không?`;
+            }
             break;
           }
 
@@ -207,6 +216,45 @@ export async function POST(request: NextRequest) {
       { error: 'Internal server error', reply: 'Xin lỗi, hệ thống đang bận. Vui lòng thử lại sau.' },
       { status: 500 }
     );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getUserFromToken(request);
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const sessionId = searchParams.get('sessionId');
+
+    if (sessionId) {
+      // Get messages for a specific session
+      const messages = await sql`
+        SELECT id, role, message_text, created_at, related_product_id
+        FROM ai_chat_history
+        WHERE session_id = ${sessionId} AND user_id = ${user.userId}
+        ORDER BY created_at ASC
+      `;
+      return NextResponse.json({ success: true, data: messages });
+    } else {
+      // Get list of unique sessions for the user
+      const sessions = await sql`
+        SELECT 
+          session_id, 
+          MAX(created_at) as last_message_at,
+          (SELECT message_text FROM ai_chat_history WHERE session_id = main.session_id ORDER BY created_at DESC LIMIT 1) as last_message
+        FROM ai_chat_history main
+        WHERE user_id = ${user.userId}
+        GROUP BY session_id
+        ORDER BY last_message_at DESC
+      `;
+      return NextResponse.json({ success: true, data: sessions });
+    }
+  } catch (error) {
+    console.error('[Chat History] Error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 

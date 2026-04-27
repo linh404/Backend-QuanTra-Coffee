@@ -12,9 +12,13 @@ const tools = [
         q: { type: 'string', description: 'Search query for product name' },
         category_id: { type: 'string', description: 'Category ID to filter by' },
         category_name: { type: 'string', description: 'Category name to filter by' },
-        price_min: { type: 'number', description: 'Minimum price' },
-        price_max: { type: 'number', description: 'Maximum price' },
+        price_min: { type: 'number', description: 'Minimum price (always in VND, e.g., 50000 instead of 50k)' },
+        price_max: { type: 'number', description: 'Maximum price (always in VND, e.g., 500000 instead of 500k)' },
         in_stock_only: { type: 'boolean', description: 'Only show in-stock products' },
+        sort: { 
+          type: 'string', 
+          description: 'Sort order: price_asc, price_desc, discount_desc (giảm sâu), best_selling (bán chạy), top_rated (đánh giá tốt), newest (mới nhất), random (đề xuất ngẫu nhiên)' 
+        },
         page: { type: 'number', description: 'Page number for pagination' },
       },
     },
@@ -100,10 +104,20 @@ const CAFE_EVENTS_POLICY = process.env.CAFE_EVENTS_POLICY || "Đang cập nhật
 const systemPrompt = `Bạn là trợ lý ảo của ${CAFE_NAME} - cửa hàng chuyên cung cấp cà phê chất lượng cao, trà và các thiết bị pha chế.
 Nhiệm vụ:
 1. Khi khách hỏi về sản phẩm, giá cả, danh mục, ngân sách, hoặc muốn xem gợi ý mua hàng, BẠN PHẢI GỌI TOOL NGAY LẬP TỨC để lấy dữ liệu. TUYỆT ĐỐI KHÔNG trả lời các câu như "Vui lòng đợi một chút để tôi kiểm tra..." mà hãy thực hiện gọi tool luôn.
-2. Nếu tin nhắn hiện tại liên quan đến ngữ cảnh trước đó, hãy sử dụng lịch sử hội thoại để suy ra nhu cầu và tiếp tục gọi tool. Không trả lời chung chung khi có thể truy vấn dữ liệu thật.
-3. Không tự bịa số liệu hoặc sản phẩm. Nếu thiếu thông tin, hãy hỏi lại khách hàng một cách ngắn gọn.
-4. Ưu tiên hiển thị tối đa 5 sản phẩm. Nếu sản phẩm đang giảm giá, hãy nhấn mạnh giá giảm.
-5. Trả lời thân thiện, lịch sự và chuyên nghiệp theo phong cách phục vụ của ${CAFE_NAME}.
+2. XỬ LÝ ĐƠN VỊ TIỀN TỆ: Tự động quy đổi các từ như "50k" -> 50000, "1 củ" -> 1000000, "lít" -> 100000 sang con số đầy đủ trước khi truyền vào tham số price_min/price_max.
+3. SMART BUDGETING: Nếu khách đưa ra ngân sách khoảng 50k, hãy tự thiết lập price_min=40000 và price_max=60000 để tìm kiếm linh hoạt hơn.
+4. ƯU TIÊN SẮP XẾP:
+   - "Đắt nhất" -> sort="price_desc"
+   - "Rẻ nhất" -> sort="price_asc"
+   - "Bán chạy nhất/Nhiều người mua" -> sort="best_selling"
+   - "Giảm giá sâu nhất/Khuyến mãi tốt" -> sort="discount_desc"
+   - "Đánh giá tốt nhất/Nhiều sao" -> sort="top_rated"
+   - "Mới nhất" -> sort="newest"
+   - "Tự do đề xuất/Gợi ý ngẫu nhiên" -> sort="random"
+5. Nếu khách muốn mua quà biếu/tặng, hãy tự động thêm "quà" hoặc "hộp quà" vào từ khóa tìm kiếm (q).
+6. Không tự bịa số liệu hoặc sản phẩm. Nếu thiếu thông tin, hãy hỏi lại khách hàng một cách ngắn gọn.
+7. Ưu tiên hiển thị tối đa 5 sản phẩm. Nếu sản phẩm đang giảm giá, hãy nhấn mạnh giá giảm.
+8. Trả lời thân thiện, lịch sự và chuyên nghiệp theo phong cách phục vụ của ${CAFE_NAME}.
 
 THÔNG TIN PHỔ BIẾN VỀ ${CAFE_NAME.toUpperCase()} (Dùng để trả lời trực tiếp không cần gọi tool):
 - Địa chỉ quán: ${CAFE_ADDRESS}

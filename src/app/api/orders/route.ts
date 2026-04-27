@@ -159,6 +159,10 @@ export async function POST(request: NextRequest) {
         })
       } catch (err: any) {
         console.error('VNPay error:', err)
+        return NextResponse.json(
+          { success: false, error: 'Không thể tạo liên kết thanh toán VNPay. Vui lòng kiểm tra cấu hình.' },
+          { status: 500 }
+        )
       }
     } else if (normalizedPayment === 'MOMO') {
       try {
@@ -180,9 +184,17 @@ export async function POST(request: NextRequest) {
           `
         } else {
           console.error('MoMo payment creation failed:', result.error)
+          return NextResponse.json(
+            { success: false, error: 'Không thể tạo liên kết thanh toán MoMo.' },
+            { status: 500 }
+          )
         }
       } catch (err: any) {
         console.error('MoMo error:', err)
+        return NextResponse.json(
+          { success: false, error: 'Lỗi kết nối cổng thanh toán MoMo.' },
+          { status: 500 }
+        )
       }
     }
 

@@ -26,9 +26,9 @@ export async function GET(
         pr.rating,
         pr.comment,
         pr.created_at,
-        u.name as user_name
+        COALESCE(u.name, 'Khách hàng') as user_name
       FROM product_reviews pr
-      JOIN users u ON pr.user_id = u.id
+      LEFT JOIN users u ON pr.user_id = u.id
       WHERE pr.product_id = ${productId}
       ORDER BY pr.created_at DESC
     `;
