@@ -5,6 +5,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const excludeId = searchParams.get('excludeId')
+    const categoryId = searchParams.get('categoryId')
     const limit = parseInt(searchParams.get('limit') || '10')
 
     let query = `
@@ -13,11 +14,16 @@ export async function GET(request: Request) {
       LEFT JOIN categories c ON p.category_id = c.id
       WHERE p.is_active = 1
     `
-    const values: Array<number> = []
+    const values: Array<any> = []
 
     if (excludeId) {
       query += ' AND p.id != ?'
       values.push(parseInt(excludeId))
+    }
+
+    if (categoryId) {
+      query += ' AND p.category_id = ?'
+      values.push(parseInt(categoryId))
     }
 
     query += ' ORDER BY RAND() LIMIT ?'

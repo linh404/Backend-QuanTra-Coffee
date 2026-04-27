@@ -51,6 +51,7 @@ export async function GET(
       brand: product.brand,
       shortDescription: product.short_description,
       description: product.description,
+      detailedDescription: product.desc,
       price: product.price,
       salePrice: product.sale_price,
       isSale: product.is_sale || false,

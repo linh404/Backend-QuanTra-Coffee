@@ -1,18 +1,15 @@
-const { neon } = require('@neondatabase/serverless');
-require('dotenv').config({ path: '.env.local' });
-
-const sql = neon(process.env.DATABASE_URL);
+import { sql } from './src/lib/db.js';
+import dotenv from 'dotenv';
+dotenv.config();
 
 async function check() {
   try {
-    const orders = await sql`SELECT * FROM orders`;
-    console.log('Orders:', JSON.stringify(orders, null, 2));
-    
-    const users = await sql`SELECT * FROM users`;
-    console.log('Users:', JSON.stringify(users, null, 2));
+    const columns = await sql.query('SHOW COLUMNS FROM products');
+    console.log(JSON.stringify(columns, null, 2));
+    process.exit(0);
   } catch (err) {
-    console.error('Error:', err);
+    console.error(err);
+    process.exit(1);
   }
 }
-
 check();
